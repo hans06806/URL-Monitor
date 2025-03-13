@@ -1,11 +1,9 @@
-WebMon - URL Monitoring System
+## WebMon - URL Monitoring System
 
-📌 Background
+## 📌 Background
 
 WebMon is a URL monitoring system that periodically checks website availability, response time, and health status. 
 It uses Kafka for event-driven architecture and stores monitoring results in a PostgreSQL database.
-
-🚀 Tech Stack
 
 ## 🚀 Tech Stack
 
@@ -21,10 +19,8 @@ It uses Kafka for event-driven architecture and stores monitoring results in a P
 
 📖 Features
 
-✅ Add URLs for monitoring via API.
-✅ Monitor URLs asynchronously using httpx.
-✅ Store monitoring results in PostgreSQL.
-✅ Event-driven processing with Kafka.
-✅ View monitoring results via API.
-
-TBC
+|✅ Add URLs for monitoring via API.            |
+|✅ Monitor URLs asynchronously using httpx.    |
+|✅ Store monitoring results in PostgreSQL.     |   
+|✅ Event-driven processing with Kafka.         |
+|✅ View monitoring results via API.            |

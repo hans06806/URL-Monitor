@@ -8,7 +8,7 @@ app = Flask(__name__)
 @app.route('/urls', methods=['POST'])
 def add_url():
     data = request.get_json()
-    db: Session = get_db()
+    db: Session = next(get_db())
     url = URL(url=data['url'])
     db.add(url)
     db.commit()

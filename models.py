@@ -11,7 +11,7 @@ class URL(Base):
     id = Column(Integer, primary_key=True)
     url = Column(String, nullable=False)
     created_at = Column(DateTime, default=datetime.now)
-    checks = relationship('Check', backref='url')
+    ## checks = relationship('Check', backref='url')
 
 class URLStatus(Base):
     __tablename__ = 'url_status'

@@ -17,30 +17,44 @@ async def check_url(url_obj):
         try:
             start = datetime.now()
             response = await client.get(url_obj.url, timeout=10)
-            response_time = (datetime.now() - start).microseconds / 1000
-            status = URLStatus(url_id=url_obj.id, status_code=response.status_code, response_time=response_time, is_up=response.status_code == 200)
-        except Exception:
-            status = URLStatus(url_id=url_obj.id, status_code=0, response_time=0, is_up=False)
+            response_time = (datetime.now() - start).total_seconds() * 1000  # Convert to ms
+            status = URLStatus(
+                url_id=url_obj.id,
+                status_code=response.status_code,
+                response_time=response_time,
+                is_up=response.status_code == 200
+            )
+        except Exception as e:
+            print(f"Error checking URL {url_obj.url}: {e}")
+            status = URLStatus(
+                url_id=url_obj.id,
+                status_code=0,
+                response_time=0,
+                is_up=False
+            )
 
+    # Format the Kafka message BEFORE closing the session
+    kafka_message = f"URL {url_obj.url} is {'UP' if status.is_up else 'DOWN'}, status: {status.status_code}"
+
+    # Save the status to the database
     db = SessionLocal()
     db.add(status)
     db.commit()
+    db.close()  # Now safe to close the session
+
+    # Send the Kafka message
+    await send_kafka_message(kafka_message)
+
+async def monitor_urls_once():
+    db = SessionLocal()
+    urls = db.query(URL).all()
+    tasks = [check_url(url) for url in urls]
+    await asyncio.gather(*tasks)
     db.close()
-
-    await send_kafka_message(f"URL {url_obj.url} is {'UP' if status.is_up else 'DOWN'}, status: {status.status_code}")
-
-async def monitor_urls():
-    while True:
-        db = SessionLocal()
-        urls = db.query(URL).all()
-        tasks = [check_url(url) for url in urls]
-        await asyncio.gather(*tasks)
-        db.close()
-        await asyncio.sleep(60)
 
 async def main():
     scheduler = AsyncIOScheduler()
-    scheduler.add_job(monitor_urls, "interval", seconds=60)
+    scheduler.add_job(monitor_urls_once, "interval", seconds=60)
     scheduler.start()
 
     # Keep the event loop alive
