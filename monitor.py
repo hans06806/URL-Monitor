@@ -5,6 +5,16 @@ from apscheduler.schedulers.asyncio import AsyncIOScheduler
 from database import SessionLocal
 from models import URL, URLStatus
 from datetime import datetime
+import logging
+from asyncio import Lock
+
+monitor_lock = Lock()  # Prevents multiple jobs from running at the same time
+
+# Enable detailed logging
+logging.basicConfig(level=logging.DEBUG, format="%(asctime)s - %(levelname)s - %(message)s")
+
+logging.debug("[Monitor] Starting monitoring script...")
+
 
 async def send_kafka_message(status):
     producer = AIOKafkaProducer(bootstrap_servers="localhost:9092")
@@ -13,44 +23,46 @@ async def send_kafka_message(status):
     await producer.stop()
 
 async def check_url(url_obj):
+    logging.debug(f"[Monitor] Checking URL: {url_obj.url}")
     async with httpx.AsyncClient() as client:
         try:
             start = datetime.now()
             response = await client.get(url_obj.url, timeout=10)
-            response_time = (datetime.now() - start).total_seconds() * 1000  # Convert to ms
+            response_time = (datetime.now() - start).total_seconds() * 1000
             status = URLStatus(
                 url_id=url_obj.id,
                 status_code=response.status_code,
                 response_time=response_time,
                 is_up=response.status_code == 200
             )
+            logging.info(f"[Monitor] URL {url_obj.url} is UP, status: {status.status_code}, response time: {response_time:.2f} ms")
         except Exception as e:
-            print(f"Error checking URL {url_obj.url}: {e}")
-            status = URLStatus(
-                url_id=url_obj.id,
-                status_code=0,
-                response_time=0,
-                is_up=False
-            )
-
-    # Format the Kafka message BEFORE closing the session
+            logging.error(f"[Monitor] Error checking {url_obj.url}: {e}")
+            status = URLStatus(url_id=url_obj.id, status_code=0, response_time=0, is_up=False)
+    
     kafka_message = f"URL {url_obj.url} is {'UP' if status.is_up else 'DOWN'}, status: {status.status_code}"
-
-    # Save the status to the database
+    
     db = SessionLocal()
     db.add(status)
     db.commit()
-    db.close()  # Now safe to close the session
+    db.close()
 
-    # Send the Kafka message
     await send_kafka_message(kafka_message)
 
 async def monitor_urls_once():
-    db = SessionLocal()
-    urls = db.query(URL).all()
-    tasks = [check_url(url) for url in urls]
-    await asyncio.gather(*tasks)
-    db.close()
+    async with monitor_lock:  # Prevent duplicate execution
+        logging.debug("[Monitor] Fetching URLs from database...")
+        db = SessionLocal()
+        urls = db.query(URL).all()
+        db.close()
+
+        if not urls:
+            logging.warning("[Monitor] No URLs found in database.")
+            return
+
+        logging.debug(f"[Monitor] Found {len(urls)} URLs to check.")
+        tasks = [check_url(url) for url in urls]
+        await asyncio.gather(*tasks)
 
 async def main():
     scheduler = AsyncIOScheduler()
