@@ -11,10 +11,19 @@ from asyncio import Lock
 monitor_lock = Lock()  # Prevents multiple jobs from running at the same time
 
 # Enable detailed logging
-logging.basicConfig(level=logging.DEBUG, format="%(asctime)s - %(levelname)s - %(message)s")
+logging.basicConfig(
+    level=logging.INFO,  # Reduce verbosity
+    format="%(asctime)s - %(levelname)s - %(message)s",
+)
 
-logging.debug("[Monitor] Starting monitoring script...")
-
+# Example usage in Kafka
+def send_message(producer, topic, message):
+    try:
+        logging.info(f"Sending message to Kafka: {topic} -> {message[:50]}...")
+        producer.send(topic, message.encode())
+        logging.info("Message sent successfully.")
+    except Exception as e:
+        logging.error(f"Failed to send message: {e}")
 
 async def send_kafka_message(status):
     producer = AIOKafkaProducer(bootstrap_servers="localhost:9092")
