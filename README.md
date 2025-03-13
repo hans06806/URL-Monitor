@@ -19,8 +19,10 @@ It uses Kafka for event-driven architecture and stores monitoring results in a P
 
 📖 Features
 
-|✅ Add URLs for monitoring via API.            |
-|✅ Monitor URLs asynchronously using httpx.    |
-|✅ Store monitoring results in PostgreSQL.     |   
-|✅ Event-driven processing with Kafka.         |
-|✅ View monitoring results via API.            |
+| Feature                                    |
+|--------------------------------------------|
+| ✅ Add URLs for monitoring via API.        |
+| ✅ Monitor URLs asynchronously using httpx.|
+| ✅ Store monitoring results in PostgreSQL. |
+| ✅ Event-driven processing with Kafka.     |
+| ✅ View monitoring results via API.        |
