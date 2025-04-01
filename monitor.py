@@ -1,12 +1,12 @@
-import asyncio
-import httpx
-from aiokafka import AIOKafkaProducer
+import asyncio # Provides asynchronous task management.
+import httpx # Provides asynchronous HTTP requests.
+from aiokafka import AIOKafkaProducer # Provides asynchronous Kafka producer.
 from apscheduler.schedulers.asyncio import AsyncIOScheduler
 from database import SessionLocal
 from models import URL, URLStatus
-from datetime import datetime
+from datetime import datetime # Provides date and time utilities.
 import logging
-from asyncio import Lock
+from asyncio import Lock # Provides a lock to prevent multiple jobs from running at the same time.
 
 monitor_lock = Lock()  # Prevents multiple jobs from running at the same time
 
@@ -24,6 +24,7 @@ def send_message(producer, topic, message):
         logging.info("Message sent successfully.")
     except Exception as e:
         logging.error(f"Failed to send message: {e}")
+# Sends messages to a Kafka topic with basic error handling.
 
 async def send_kafka_message(status):
     producer = AIOKafkaProducer(bootstrap_servers="localhost:9092")
@@ -31,10 +32,13 @@ async def send_kafka_message(status):
     await producer.send_and_wait("url_status", bytes(str(status), "utf-8"))
     await producer.stop()
 
-async def check_url(url_obj):
+# Connects asynchronously to Kafka, publishes URL status messages, 
+# and then cleanly closes the producer connection.
+
+async def check_url(url_obj): # Checks the status of a URL and saves the result to the database.
     logging.debug(f"[Monitor] Checking URL: {url_obj.url}")
     async with httpx.AsyncClient() as client:
-        try:
+        try: #Perform an HTTP GET request to the URL
             start = datetime.now()
             response = await client.get(url_obj.url, timeout=10)
             response_time = (datetime.now() - start).total_seconds() * 1000
@@ -48,7 +52,8 @@ async def check_url(url_obj):
         except Exception as e:
             logging.error(f"[Monitor] Error checking {url_obj.url}: {e}")
             status = URLStatus(url_id=url_obj.id, status_code=0, response_time=0, is_up=False)
-    
+    # Creates a URLStatus object based on the HTTP response.
+    # Logs the status of the URL and the response time.
     kafka_message = f"URL {url_obj.url} is {'UP' if status.is_up else 'DOWN'}, status: {status.status_code}"
     
     db = SessionLocal()
@@ -56,7 +61,7 @@ async def check_url(url_obj):
     db.commit()
     db.close()
 
-    await send_kafka_message(kafka_message)
+    await send_kafka_message(kafka_message) # Sends the monitoring result asynchronously to Kafka.
 
 async def monitor_urls_once():
     async with monitor_lock:  # Prevent duplicate execution
@@ -72,8 +77,9 @@ async def monitor_urls_once():
         logging.debug(f"[Monitor] Found {len(urls)} URLs to check.")
         tasks = [check_url(url) for url in urls]
         await asyncio.gather(*tasks)
+# Fetches URLs from the database, checks their status, and sends the results to Kafka.
 
-async def main():
+async def main(): # Initializes an asynchronous scheduler to trigger URL checks every 60 seconds.
     scheduler = AsyncIOScheduler()
     scheduler.add_job(monitor_urls_once, "interval", seconds=60)
     scheduler.start()
